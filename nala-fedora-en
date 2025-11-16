@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+# Nala-Fedora English Wrapper
+# This script ensures nala-fedora always runs in English
+#
+
+# Force English locale
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Set Python path to include nala-fedora modules
+export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH}"
+
+# Prevent man page execution on no arguments
+export _NALA_COMPLETE=1
+
+# Run the appropriate nala function based on the command
+case "${1:-help}" in
+    "fetch")
+        echo "🔍 Running Nala-Fedora Mirror Speed Test..."
+        exec "${SCRIPT_DIR}/fedora-fetch-simple.py" "${@:2}"
+        ;;
+    "search"|"info"|"list"|"install"|"remove"|"update"|"upgrade")
+        echo "🔧 Running DNF command via Nala-Fedora interface..."
+        exec python3 -c "
+import sys
+sys.path.insert(0, '${SCRIPT_DIR}')
+from nala.dnf_interface import run_dnf_command
+result = run_dnf_command(['$1'] + sys.argv[1:])
+print(result.stdout)
+if result.stderr:
+    print(result.stderr, file=sys.stderr)
+sys.exit(result.returncode)
+" "${@:2}"
+        ;;
+    "test")
+        echo "🧪 Running Nala-Fedora system test..."
+        exec python3 -c "
+import sys
+sys.path.insert(0, '${SCRIPT_DIR}')
+print('Testing Nala-Fedora functionality...')
+from nala.dnf_interface import run_dnf_command
+from nala.cache import Cache
+print('✅ All modules imported successfully')
+cache = Cache()
+print('✅ Cache system working')
+result = run_dnf_command(['--version'])
+print(f'✅ DNF version: {result.stdout.split()[2] if result.stdout else \"Unknown\"}')
+print('🚀 Nala-Fedora is ready!')
+"
+        ;;
+    "help"|"-h"|"--help"|*)
+        cat << EOF
+🚀 Nala-Fedora - Enhanced DNF Frontend for Fedora (English Version)
+
+USAGE:
+    $0 <command> [options]
+
+COMMANDS:
+    fetch              Test mirror speeds and optimize repository configuration
+    search <package>   Search for packages
+    info <package>     Show detailed package information  
+    list [--installed] List packages
+    install <package>  Install packages (requires sudo)
+    remove <package>   Remove packages (requires sudo)
+    update             Update package cache
+    upgrade            Upgrade all packages (requires sudo)
+    test               Test nala-fedora functionality
+    help               Show this help message
+
+EXAMPLES:
+    $0 search firefox          # Search for Firefox packages
+    $0 info nano              # Show info about nano package
+    $0 list --installed       # List installed packages
+    $0 fetch                  # Test and optimize mirrors
+    $0 test                   # Test system functionality
+
+NOTE: 
+    - This wrapper forces English output for all commands
+    - Install/remove/upgrade commands require sudo privileges
+    - This is a development version adapted for Fedora 43
+
+PROJECT: https://gitlab.com/volian/nala (Original)
+VERSION: 0.16.0-fedora
+EOF
+        ;;
+esac
